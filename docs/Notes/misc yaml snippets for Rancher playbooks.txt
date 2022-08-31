@@ -1,0 +1,85 @@
+Add to /etc/rancher/rke2/config.yaml and additional hardening (ALL RKE2 NODES)
+  - name: Add cis-1.6 hardening to config.yaml
+    lineinfile:
+      line: "{{ item }"
+      state: present
+      backup: yes
+    with_items:
+      - profile: "cis-1.6"
+      - write-kubeconfig-mode: "0644"
+      - selinux: true
+ 
+  - name: Add etcd user
+    group:
+      name: etcd
+      state: present
+	  
+  - name: Add etcd user
+    user:
+      name: etcd
+      group: etcd
+      state: present
+      shell: /sbin/nologin
+      comment: "etcd user"
+
+  - name: Copy rke2-cis-sysctl.conf to sysctl.d
+    copy:
+      src: /usr/local/share/rke2/rke2-cis-sysctl.conf
+      dest: /etc/sysctl.d/60-rke2-cis.conf
+      remote_src: yes
+      
+
+Remove system-default-registry from /etc/rancher/rke2/config.yaml (ALL RKE2 NODES)
+
+  - name: Remove system-default-registry declaration in config.yaml for rke2 1.20.X and greater
+    lineinfile:
+      path: "/etc/rancher/rke2/config.yaml"
+      regexp: "^system-default-registry"
+      state: absent
+    when: rke2_version is version('1.20', '>=')
+
+Uncomment endpoint rewrites in /etc/rancher/rke2/registries.yaml (ALL RKE2 NODES)
+
+  - name: Modify registries.yaml for 1.20.X and greater
+    replace:
+      path: "/etc/rancher/rke2/registries.yaml"
+      regexp: "^#replace"
+      replace: ""
+    when: rke2_version is version('1.20', '>=')
+
+Populate the upgrade yaml files on the primary node of the rke2 cluster (against rancher_mcm0 or rancher_api0)
+  - name: Populate Upgrade Yaml Files on Primary RKE2 Cluster node
+    template: 
+      src: "templates/upgrade/{{ item }}"
+      dest: "/root/{{ item }}"
+    with_items:
+      - system-upgrade-controller.yaml
+      - upgrade_plan.yaml
+    when: inventory_hostname == rancher_mcm0 or
+          inventory_hostname == rancher_api0
+
+Install system-upgrade-controller
+  - name: Install system-upgrade-controller
+    shell: 
+      cmd: "kubectl apply -f /root/system-upgrade-controller.yaml"
+    when: inventory_hostname == rancher_mcm0 or
+          inventory_hostname == rancher_api0
+
+Pause for station identification
+  - name: Give system-upgrade-controller pod time to come upgrade
+    pause:
+      seconds: 90
+    when: inventory_hostname == rancher_mcm0 or
+          inventory_hostname == rancher_api0
+                
+Apply upgrade plans
+  - name: Apply upgrade plans
+    shell:
+      cmd: "kubectl apply -f /root/upgrade_plan.yaml"
+    when: inventory_hostname == rancher_mcm0 or
+          inventory_hostname == rancher_api0
+ 
+Need to override rke2_version with Survey.....
+j
+
+

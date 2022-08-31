@@ -1,0 +1,258 @@
+---
+- name: Init Rancher Cluster Nodes
+  hosts: all
+  gather_facts: no
+  become: true
+  become_method: sudo
+  become_exe: /usr/bin/sudo
+
+  tasks:
+  - name: Check for /dev/sdb
+    stat:
+      path: /dev/sdb
+    register: stat_sdb
+
+  - name: Check for /dev/sdc
+    stat:
+      path: /dev/sdc
+    register: stat_sdc
+
+  - name: Check for /dev/sdb1
+    stat:
+      path: /dev/sdb1
+    register: stat_sdb1
+
+  - name: Check for /dev/sdc1
+    stat:
+      path: /dev/sdc1
+    register: stat_sdc1
+
+  - name: Partition disk for /var/lib/rancher
+    parted:
+      device: /dev/sdb
+      label: gpt
+      number: 1
+      state: present
+    when: stat_sdb.stat.exists and
+          stat_sdb1.stat.exists != True
+
+  - name: Partition disk for /var/lib/longhorn
+    parted:
+      device: /dev/sdc
+      label: gpt
+      number: 1
+      state: present
+    when: stat_sdc.stat.exists and
+          stat_sdc1.stat.exists != True
+
+  - name: Create LVM rancher volume group
+    lvg:
+      vg: vg_rancher
+      pvs: /dev/sdb1
+    when: stat_sdb.stat.exists and
+          stat_sdb1.stat.exists != True
+
+  - name: Create LVM longhorn volume group
+    lvg:
+      vg: vg_longhorn
+      pvs: /dev/sdc1
+    when: stat_sdc.stat.exists and
+          stat_sdc1.stat.exists != True
+
+  - name: Create LVM LV rancher
+    lvol:
+      vg: vg_rancher
+      lv: lv_a00
+      opts: -r 4096
+      size: 100%FREE
+      force: yes
+    ignore_errors: yes
+    when: stat_sdb.stat.exists and
+          stat_sdb1.stat.exists != True
+
+  - name: Create LVM LV longhorn
+    lvol:
+      vg: vg_longhorn
+      lv: lv_a00
+      opts: -r 4096
+      size: 100%FREE
+      force: yes
+    ignore_errors: yes
+    when: stat_sdc.stat.exists and
+          stat_sdc1.stat.exists != True
+
+  - name: Create xfs on LV rancher
+    filesystem:
+      fstype: xfs
+      dev: /dev/vg_rancher/lv_a00
+      opts: -K
+      force: yes
+    when: stat_sdb.stat.exists and
+          stat_sdb1.stat.exists != True
+
+  - name: Create xfs on LV longhorn
+    filesystem:
+      fstype: xfs
+      dev: /dev/vg_longhorn/lv_a00
+      opts: -K
+      force: yes
+    when: stat_sdc.stat.exists and
+          stat_sdc1.stat.exists != True
+
+  - name: Mkdir /var/lib/rancher
+    file:
+      state: directory
+      mode: '0700'
+      owner: root
+      group: root
+      path: /var/lib/rancher
+    when: stat_sdb.stat.exists and
+          stat_sdb1.stat.exists != True
+
+  - name: Mkdir /var/lib/longhorn
+    file:
+      state: directory
+      mode: '0700'
+      owner: root
+      group: root
+      path: /var/lib/longhorn
+    when: stat_sdc.stat.exists and
+          stat_sdc1.stat.exists != True
+
+  - name: add mount /var/lib/rancher
+    mount:
+      fstype: xfs
+      opts: defaults,nodev
+      src: /dev/vg_rancher/lv_a00
+      path: /var/lib/rancher
+      state: mounted
+    when: stat_sdb.stat.exists and
+          stat_sdb1.stat.exists != True
+
+  - name: add mount /var/lib/longhorn
+    mount:
+      fstype: xfs
+      opts: defaults,nodev
+      src: /dev/vg_longhorn/lv_a00
+      path: /var/lib/longhorn
+      state: mounted
+    when: stat_sdc.stat.exists and
+          stat_sdc1.stat.exists != True
+
+  - name: Copy certificate to /etc/pki/anchors
+    copy:
+      src: "files/caasp/{{ env_initial }}caasp/a00/certs/caasp.crt"
+      dest: /etc/pki/trust/anchors/caasp.crt
+      owner: root
+      group: root
+      mode: '0644'
+
+  - name: Populate company certificates and CA
+    copy:
+      src: files/etc/pki/trust/anchors/
+      dest: /etc/pki/trust/anchors/
+      owner: root
+      group: root
+      mode: '0644'
+
+  - name: update-ca-certificates
+    shell:
+      cmd: /usr/sbin/update-ca-certificates
+
+  - name: populate /etc/issue
+    copy:
+      src: files/etc/issue
+      dest: /etc/issue
+      owner: root
+      group: root
+      mode: '0644'
+
+  - name: enable cgroup
+    replace:
+      path: "{{ item }}"
+      regexp: "cgroup_disable=memory "
+      replace: ""
+      backup: yes
+    with_items:
+      - /etc/default/grub
+      - /boot/grub2/grub.cfg
+
+  - name: remove swap
+    lineinfile:
+      path: /etc/fstab
+      regexp: "^/dev/vg_rootdisk/lv_swap"
+      state: absent
+
+  - name: Install needed packages from repo
+    package:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - open-iscsi
+      - jq
+    when: inventory_hostname in rancher_all_api or
+          inventory_hostname in rancher_workers
+
+  - name: Enable needed packages
+    systemd:
+      name: "{{ item }}"
+      enabled: yes
+      state: started
+      daemon_reload: yes
+    with_items:
+      - iscsid
+    when: inventory_hostname in rancher_all_api or
+          inventory_hostname in rancher_workers
+
+  - name: Patch
+    zypper:
+      name: "*"
+      state: latest
+
+#  - name: Check if a reboot is needed on all SUSE/OpenSUSE based servers
+#    register: linux_reboot_required_file
+#    stat: path=/boot/do_purge_kernels get_md5=no
+
+  - name: Reboot the server
+    shell:
+      cmd: /sbin/shutdown -r +1 "Ansible directed shutdown"
+    poll: 0
+
+  - name: Wait for ssh to be available
+    wait_for_connection:
+      delay: 90
+      sleep: 20
+    become: false
+
+#- name: install load balancers
+#  import_playbook: install_loadbalancer.yml
+#  when: inventory_hostname in rancher_api_loadbalance_all
+
+- name: do common tasks on rke2 nodes
+  import_playbook: common_rke2.yml
+
+- name: install first node
+  import_playbook: install_rke2_firstnode.yml
+  when: inventory_hostname in rancher_api0
+
+- name: install and configure kubevip
+  import_playbook: kubevip_firstnode.yml
+  when: inventory_hostname in rancher_api0
+
+- name: install secondary
+  import_playbook: install_rke2_secondary.yml
+  when: inventory_hostname in rancher_api_secondary
+
+- name: install and configure kubevip on secondary api nodes
+  import_playbook: kubevip_secondary.yml
+  when: inventory_hostname in rancher_api_secondary
+
+- name: install workers
+  import_playbook: install_rke2_worker.yml
+  when: inventory_hostname in rancher_workers
+
+- name: harden rke2
+  import_playbook: harden_rke2.yml
+
+- name: restart all nodes
+  import_playbook: rolling_restart.yml

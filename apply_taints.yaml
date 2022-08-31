@@ -1,0 +1,20 @@
+---
+- name: Apply Taints to Control-Plane nodes
+  hosts: all
+  gather_facts: no
+  become: true
+  become_method: sudo
+  become_exe: /usr/bin/sudo
+  
+  tasks:
+  - name: apply control-plane NoSchedule taint to api nodes
+    shell:
+      cmd: '/var/lib/rancher/rke2/bin/kubectl taint nodes {{ item }} node-role.kubernetes.io/control-plane=true:NoSchedule' 
+    with_items: "{{ rancher_all_api.split(' ') }}"
+    when: inventory_hostname in rancher_api0
+
+  - name: apply etcd NoExecute taint to api nodes
+    shell:
+      cmd: '/var/lib/rancher/rke2/bin/kubectl taint nodes {{ item }} node-role.kubernetes.io/etcd=true:NoExecute' 
+    with_items: "{{ rancher_all_api.split(' ') }}"
+    when: inventory_hostname in rancher_api0

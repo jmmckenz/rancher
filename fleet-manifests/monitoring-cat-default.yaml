@@ -1,0 +1,16 @@
+apiVersion: fleet.cattle.io/v1alpha1
+kind: GitRepo
+metadata:
+  name: company-monitoring
+  namespace: fleet-default
+spec:
+  branch: cat
+  insecureSkipTLSVerify: true
+  paths:
+  - ./rancher-monitoring-crd
+  - ./rancher-monitoring
+  - ./company-monitoring-config
+  pollingInterval: 60s
+  repo: https://github.company.com/itas/k8s-rancher-monitoring
+  targets:
+  - clusterSelector: {}

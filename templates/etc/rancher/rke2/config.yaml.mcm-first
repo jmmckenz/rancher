@@ -1,0 +1,6 @@
+system-default-registry: {{ rancher_internal_airgap }}.company.com/docker.io
+tls-san:
+  - {{ inventory_hostname }}
+  - {{ inventory_hostname }}.{{ cluster_domain }}
+  - {{ rancher_mcm_loadbalancer_vip_name }}
+  - {{ rancher_mcm_loadbalancer_vip_name }}.{{ cluster_domain }}

@@ -1,0 +1,15 @@
+apiVersion: fleet.cattle.io/v1alpha1
+kind: GitRepo
+metadata:
+  name: company-cis-benchmark
+  namespace: fleet-default
+spec:
+  branch: release-v2.6.2
+  insecureSkipTLSVerify: true
+  paths:
+  - ./rancher-cis-benchmark-crd
+  - ./rancher-cis-benchmark
+  pollingInterval: 60s
+  repo: https://github.company.com/rancher/fleet-cis-benchmark
+  targets:
+  - clusterSelector: {}

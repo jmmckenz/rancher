@@ -1,0 +1,6 @@
+registry.suse.com/sles12/registry:2.6.2
+registry.suse.com/caasp/v4/helm-tiller:2.16.1
+registry.suse.com/suse/sle15:15.1
+registry.suse.com/suse/sle15:15.2
+registry.suse.com/suse/sle15:15.3
+registry.suse.com/suse/sles12sp5:latest

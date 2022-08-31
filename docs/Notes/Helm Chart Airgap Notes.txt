@@ -1,0 +1,87 @@
+AIRGAPS
+
+
+from /var/lib/charts
+
+helm3 repo add rancher-stable https://releases.rancher.com/server-charts/stable
+helm3 fetch rancher-stable/rancher 
+helm3  repo add jetstack https://charts.jetstack.io
+helm3 fetch jetstack/cert-manager --version v1.0.4
+helm repo index .
+
+
+
+
+
+On Nodes:
+cd /root
+get helm
+wget https://server-b00.james.cc/charts/helm --no-check-certificate
+chmod +x helm
+pull charts
+/root/bin/helm repo add usps-rancher https://server-b00.james.cc/charts --insecure-skip-tls-verify
+/root/bin/helm fetch usps-rancher/rancher --insecure-skip-tls-verify
+/root/bin/helm fetch usps-rancher/cert-manager --version v1.0.4 --insecure-skip-tls-verify
+
+
+
+helm template cert-manager ./cert-manager-v1.0.4.tgz --output-dir . \
+   --namespace cert-manager \
+   --set image.repository=server-b00.james.cc:443/quay.io/jetstack/cert-manager-controller \
+   --set webhook.image.repository=server-b00.james.cc:443/quay.io/jetstack/cert-manager-webhook \
+   --set cainjector.image.repository=server-b00.james.cc:443/quay.io/jetstack/cert-manager-cainjector
+
+cd cert-manager
+wget https://server-b00.james.cc/charts/cert-manager/cert-manager-crd.yaml --no-check-certificate
+
+cd /root
+
+helm template rancher ./rancher-2.5.6.tgz --output-dir . \
+ --namespace cattle-system \
+ --set hostname=server-a19.james.cc \
+ --set certmanager.version=1.0.4 \
+ --set rancherImage=server-b00.james.cc:443/docker.io/rancher/rancher \
+ --set systemDefaultRegistry=server-b00.james.cc:443 \
+ --set useBundledSystemChart=true
+
+kubectl create namespace cert-manager
+kubectl apply -f cert-manager/cert-manager-crd.yaml
+kubectl apply -R -f ./cert-manager
+
+Wait for cert-manager pod is up
+kubectl get pods -n cert-manager
+
+kubectl create namespace cattle-system
+kubectl -n cattle-system apply -R -f ./rancher
+
+
+
+
+
+Updates:
+External
+	# cd /var/lib/charts
+	# helm3 repo update
+	# helm3 fetch rancher-latest/rancher --version=2.6.2
+	# helm repo index .
+	
+Internal
+    # cd /var/lib/charts
+	# wget https://server-b01.james.cc/charts/rancher-2.6.2.tgz --no-check-certificate
+	# helm repo index .
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

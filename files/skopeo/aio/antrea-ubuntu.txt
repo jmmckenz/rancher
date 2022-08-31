@@ -1,0 +1,1 @@
+docker.io/antrea/antrea-ubuntu:v1.4.0

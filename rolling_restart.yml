@@ -1,0 +1,24 @@
+---
+- name: Rolling Restart
+  hosts: all
+  gather_facts: no
+  become: true
+  become_method: sudo
+  become_exe: /usr/bin/sudo
+  serial: 1
+  
+  tasks:
+  - name: Reboot the server
+    shell: 
+      cmd: /sbin/shutdown -r +1 "Ansible directed shutdown"
+    poll: 0
+
+  - name: Wait for ssh to be available
+    wait_for_connection: 
+      delay: 90
+      sleep: 20
+    become: false
+
+  - name: wait for several minutes to allow for node to come up
+    wait_for:
+      timeout: 180

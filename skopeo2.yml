@@ -1,0 +1,45 @@
+---
+- name: Sync External Airgap
+  hosts: all
+  gather_facts: no
+  become: true
+  become_method: sudo
+  become_exe: /usr/bin/sudo
+
+  tasks:
+  - name: Copy files to external airgap
+    copy:
+      src: files/skopeo
+      dest: /tmp/
+
+  - name: Build list of images
+    shell:
+      cmd: "cat /tmp/skopeo/aio/*.txt |sort -u" 
+    register: skopeo_images
+
+  - name: Copy images to registry
+    shell: "skopeo copy --dest-tls-verify=false docker://{{ item }} docker://{{ inventory_hostname }}.company.gov:443/{{ item }}"
+    environment:
+      http_proxy: "http://{{ proxy_ip }}:8080"
+      https_proxy: "http://{{ proxy_ip }}:8080"
+      HTTP_PROXY: "http://{{ proxy_ip }}:8080"
+      HTTPS_PROXY: "http://{{ proxy_ip }}:8080"
+      NO_PROXY: ".company.gov,{{ inventory_hostname }},{{ inventory_hostname }}.company.gov"
+    with_items: "{{ skopeo_images.stdout_lines }}"
+    ignore_errors: true
+
+#  - name: get list of repos on external registries
+#    shell:
+#      cmd: "curl -sk https://{{ inventory_hostname }}.company.gov:443/v2/_catalog?n=10000"
+#    register: ext_reg_list
+
+#  - name: sync internal airgap
+#    command: "skopeo sync --src docker --dest docker {{ inventory_hostname }}.company.gov:443/{{ item }} {{ internal_airgap }}.company.gov:443/{{ item }} --src-tls-verify=false --dest-tls-verify=false"
+#    with_items: 
+#      - "{{ (ext_reg_list.stdout |replace (':',',') |replace ('}','') |replace ('[','') | replace (']','')).split(',')[1:] }}"
+#    delegate_to: "{{ internal_airgap }}"
+
+  - name: sync internal airgap
+    command: "/root/mirrorimages -s {{ inventory_hostname }}.company.gov"
+    delegate_to: "{{ internal_airgap }}"
+

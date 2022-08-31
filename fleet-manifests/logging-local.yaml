@@ -1,0 +1,16 @@
+apiVersion: fleet.cattle.io/v1alpha1
+kind: GitRepo
+metadata:
+  name: company-logging
+  namespace: fleet-local
+spec:
+  branch: release-v2.6.2
+  insecureSkipTLSVerify: true
+  paths:
+  - ./rancher-logging-crd
+  - ./rancher-logging
+  - ./company-logging-custom
+  pollingInterval: 60s
+  repo: https://github.company.com/rancher/fleet-logging
+  targets:
+  - clusterSelector: {}

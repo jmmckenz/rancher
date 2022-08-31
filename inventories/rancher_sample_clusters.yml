@@ -1,0 +1,80 @@
+---
+all:
+  children:
+    mcm_infra_01:
+      hosts:
+        server-fcd:
+        server-fce:
+        server-fcf:
+      vars:
+        env_initial: p
+        cluster_env: prod
+        cluster_domain: company.com
+        rancher_SSL_CERT_DIR: /etc/pki/trust/anchors
+        rancher_mcm_loadbalancer_vip_name: server-fc9
+        rancher_mcm_loadbalancer_vip_ip: 192.1.1.200/22
+        rancher_mcm0: server-fcd
+        rancher_mcm1: server-fce
+        rancher_mcm2: server-fcf
+        rancher_mcm_secondary: server-fce server-fcf
+        rancher_all_mcm: server-fcd server-fce server-fcf
+        rancher_api_loadbalancer_vip_name: "empty"
+        rancher_api_loadbalancer_vip_ip: "empty"
+        rancher_api_loadbalance0: "empty"
+        rancher_api_loadbalance_all: "empty"
+        rancher_api0: "empty"
+        rancher_api1: "empty"
+        rancher_api2: "empty"
+        rancher_api_secondary: "empty"
+        rancher_all_api: "empty"
+        rancher_workers: "empty"
+        rancher_internal_airgap: server-fa2
+        rancher_version: 2.6.2
+        rke2_version: 1.21.4
+
+    rke_erai01:
+      hosts:
+        server-fd0:
+        server-fd1:
+        server-fd2:
+        server-fd3:
+        server-fd4:
+        server-fd5:
+        server-fd6:
+        server-fd7:
+      vars:
+        env_initial: p
+        cluster_env: prod
+        cluster_domain: company.com
+        cluster_name: erai01
+        rancher_SSL_CERT_DIR: /etc/pki/trust/anchors
+        rancher_mcm-cpu: "empty"
+        rancher_mcm-mem: "empty"
+        rancher_mcm_loadbalancer_vip_name: server-fc9
+        rancher_mcm_loadbalancer_vip_ip: "empty"
+        rancher_mcm_loadbalance0: "empty"
+        rancher_mcm_loadbalance1: "empty"
+        rancher_mcm_loadbalance_all: "empty"
+        rancher_mcm0: server-fcd
+        rancher_mcm1: "empty"
+        rancher_mcm2: "empty"
+        rancher_mcm_secondary: "empty"
+        rancher_all_mcm: "empty"
+        rancher_api_loadbalancer_vip_name: server-fcc
+        rancher_api_loadbalancer_vip_ip: 192.1.1.203/22
+        rancher_api0: server-fd0
+        rancher_api1: server-fd1
+        rancher_api2: server-fd2
+        rancher_api_secondary: server-fd1 server-fd2
+        rancher_all_api: server-fd0 server-fd1 server-fd2
+        rancher_workers: server-fd3 server-fd4 server-fd5 server-fd6 server-fd7
+        rancher_internal_airgap: server-fa2
+        rancher_version: 2.6.2
+        rke2_version: 1.21.4
+        ingress_ip: 192.1.1.202
+        label_env: infra
+        label_dc: dc1
+        label_network: internal
+        label_cluster_env: blue
+        mcm_cluster: mcm_infra_01
+

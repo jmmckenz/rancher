@@ -1,0 +1,22 @@
+---
+- name: Prep for run
+  hosts: localhost
+  gather_facts: no
+  become: false
+  connection: local
+
+  tasks:
+  - name: server inventory
+    add_host:
+      name: "{{ item }}"
+      groups: systems
+    with_items: "{{ var_hosts.split(' ') }}"
+
+- name: [Description of playbook]
+  hosts: systems
+  gather_facts: no
+  become: true
+  become_method: sudo
+  become_exe: /usr/bin/sudo
+  
+  tasks:

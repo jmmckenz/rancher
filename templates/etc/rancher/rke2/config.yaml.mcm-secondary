@@ -1,0 +1,8 @@
+system-default-registry: {{ rancher_internal_airgap }}.company.com/docker.io
+tls-san:
+  - {{ inventory_hostname }}
+  - {{ inventory_hostname }}.{{ cluster_domain }}
+  - {{ rancher_mcm_loadbalancer_vip_name }}
+  - {{ rancher_mcm_loadbalancer_vip_name }}.{{ cluster_domain }}
+server: https://{{ rancher_mcm_loadbalancer_vip_name }}.{{ cluster_domain }}:9345
+token: {{ rke2_token }}

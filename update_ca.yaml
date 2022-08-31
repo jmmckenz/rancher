@@ -1,0 +1,20 @@
+---
+- name: Update CA's
+  hosts: all
+  gather_facts: no
+  become: true
+  become_method: sudo
+  become_exe: /usr/bin/sudo
+  
+  tasks:
+  - name: Populate company certificates and CA
+    copy:
+      src: files/etc/pki/trust/anchors/
+      dest: /etc/pki/trust/anchors/
+      owner: root
+      group: root
+      mode: '0644' 
+
+  - name: update-ca-certificates
+    shell: 
+      cmd: /usr/sbin/update-ca-certificates

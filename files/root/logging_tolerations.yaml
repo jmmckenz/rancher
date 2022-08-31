@@ -1,0 +1,12 @@
+spec:
+  template:
+    spec:
+      tolerations:
+      - effect: NoSchedule
+        key: cattle.io/os
+        operator: Equal
+        value: linux
+      - effect: NoSchedule
+        operator: Exists
+      - effect: NoExecute
+        operator: Exists

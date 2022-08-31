@@ -1,0 +1,16 @@
+apiVersion: fleet.cattle.io/v1alpha1
+kind: GitRepo
+metadata:
+  name: company-longhorn
+  namespace: fleet-default
+spec:
+  branch: release-v2.6.2
+  insecureSkipTLSVerify: true
+  paths:
+  - ./longhorn-crd
+  - ./longhorn
+  paused: false
+  pollingInterval: 60s
+  repo: https://github.company.com/rancher/fleet-longhorn
+  targets:
+  - clusterSelector: {}

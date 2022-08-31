@@ -1,0 +1,89 @@
+---
+- name: Install kube-vip onto RKE2 Nodes
+  hosts: all
+  gather_facts: no
+  become: true
+  become_method: sudo
+  become_exe: /usr/bin/sudo
+  serial: 1
+  
+  tasks:
+  - name: Set vip_ip for api
+    set_fact: 
+      vip_ip: "{{ rancher_api_loadbalancer_vip_ip.split('/')[0] }}"
+    when: inventory_hostname in rancher_all_api
+
+  - name: Set vip_ip for mcm
+    set_fact: 
+      vip_ip: "{{ rancher_mcm_loadbalancer_vip_ip.split('/')[0] }}"
+    when: inventory_hostname in rancher_all_mcm
+
+  - name: Copy kube-vip-rbac.yaml
+    copy:
+      src: "files/var/lib/rancher/rke2/server/manifests/kube-vip-rbac.yaml"
+      dest: "/var/lib/rancher/rke2/server/manifests/kube-vip-rbac.yaml"
+    when: inventory_hostname in rancher_all_mcm or inventory_hostname in rancher_all_api
+
+  - name: Populate kube-vip.yaml 
+    template:
+      src: "templates/var/lib/rancher/rke2/server/manifests/{{ item }}"
+      dest: "/var/lib/rancher/rke2/server/manifests/{{ item }}"
+    with_items:
+      - kube-vip.yaml
+    when: inventory_hostname in rancher_all_mcm or inventory_hostname in rancher_all_api
+
+  - name: Populate kube-vip-cloud-controller.yaml and config-map
+    template:
+      src: "templates/var/lib/rancher/rke2/server/manifests/{{ item }}"
+      dest: "/var/lib/rancher/rke2/server/manifests/{{ item }}"
+    with_items:
+      - kube-vip-cloud-controller.yaml
+      - kube-vip-cloud-config-map.yaml
+    when: inventory_hostname in rancher_all_api
+
+  - name: Copy ingress-helm-config-map.yaml
+    copy:
+      src: "files/var/lib/rancher/rke2/server/manifests/ingress-helm-config-map.yaml"
+      dest: "/var/lib/rancher/rke2/server/manifests/ingress-helm-config-map.yaml"
+    when: inventory_hostname in rancher_all_api
+
+  - name: Insure Loadbalancers are offline api (keepalived)
+    systemd: 
+      name: keepalived
+      enabled: no
+      state: stopped
+      daemon_reload: yes
+    delegate_to: "{{ item }}"
+    with_items: "{{ rancher_api_loadbalance_all.split(' ') }}"
+    when: inventory_hostname in rancher_all_api
+
+  - name: Insure Loadbalancers are offline mcm (keepalived)
+    systemd: 
+      name: keepalived
+      enabled: no
+      state: stopped
+      daemon_reload: yes
+    delegate_to: "{{ item }}"
+    with_items: "{{ rancher_mcm_loadbalance_all.split(' ') }}"
+    when: inventory_hostname in rancher_all_mcm
+
+  - name: Insure nginx are offline api (keepalived)
+    systemd: 
+      name: nginx
+      enabled: no
+      state: stopped
+      daemon_reload: yes
+    delegate_to: "{{ item }}"
+    with_items: "{{ rancher_api_loadbalance_all.split(' ') }}"
+    when: inventory_hostname in rancher_all_api
+
+  - name: Insure nginx are offline mcm (keepalived)
+    systemd: 
+      name: nginx
+      enabled: no
+      state: stopped
+      daemon_reload: yes
+    delegate_to: "{{ item }}"
+    with_items: "{{ rancher_mcm_loadbalance_all.split(' ') }}"
+    when: inventory_hostname in rancher_all_mcm
+

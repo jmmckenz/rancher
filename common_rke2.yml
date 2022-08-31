@@ -1,0 +1,86 @@
+---
+- name: Install common rke2 settings
+  hosts: all
+  gather_facts: no
+  become: true
+  become_method: sudo
+  become_exe: /usr/bin/sudo
+  
+  tasks:
+  - name: Create /etc/rancher/rke2
+    file:
+      state: directory
+      mode: '0755'
+      owner: root
+      group: root
+      path: /etc/rancher/rke2
+    
+  - name: Install needed packages from repo
+    package:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - apparmor-parser
+
+  - name: Create /root/.kube
+    file:
+      state: directory
+      mode: '0755'
+      owner: root
+      group: root
+      path: /root/.kube
+    
+  - name: get rke2 tarball
+    get_url:
+      url: "https://server-f9c.company.gov/pulp/isos/company/prod/Rancher/custom/Rancher/RKE2/rke2-{{ rke2_version }}.linux-amd64.tar.gz"
+      dest: /var/tmp/rke2.linux-amd64.tar.gz
+      validate_certs: no
+ 
+  - name: extract rke2 binaries
+    unarchive:
+      src: /var/tmp/rke2.linux-amd64.tar.gz
+      dest: /usr/local
+      remote_src: yes
+
+  - name: Populate registries.yaml on all rke2
+    template:
+      src: "templates/etc/rancher/rke2/registries.yaml"
+      dest: "/etc/rancher/rke2/registries.yaml"
+
+  - name: Modify registries.yaml for 1.21.3 release
+    replace:
+      path: "/etc/rancher/rke2/registries.yaml"
+      regexp: "^#replace"
+      replace: ""
+    when: rke2_version is version('1.20', '>=')
+
+  - name: SSL_CERT_DIR Setup
+    lineinfile:
+      path: /etc/sysconfig/rke2-agent
+      line: SSL_CERT_DIR=/etc/pki/trust/anchors
+      state: present
+      create: yes
+    when: inventory_hostname in rancher_workers
+  
+  - name: SSL_CERT_DIR Setup
+    lineinfile:
+      path: /etc/sysconfig/rke2-server
+      line: SSL_CERT_DIR=/etc/pki/trust/anchors
+      state: present
+      create: yes
+    when: inventory_hostname not in rancher_workers
+  
+  - name: link .kube/config
+    file:
+      src: /etc/rancher/rke2/rke2.yaml
+      dest: /root/.kube/config
+      state: link
+      force: yes
+
+  - name: setup PATH
+    lineinfile:
+      path: /root/.profile
+      line: "PATH=$PATH:/var/lib/rancher/rke2/bin"
+      state: present
+      create: yes
+

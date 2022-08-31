@@ -1,0 +1,132 @@
+--- 
+- name: Apply eaccess roles
+  hosts: all
+  gather_facts: no 
+
+  tasks: 
+  - name: initialize variables 
+    set_fact: 
+      project_name: "{{ eir_number }}-{{ eir_acronym }}-{{ company_env }}" 
+  
+  - name: populate cli2.json
+    copy:
+      content: "{{ lookup('file', 'files/rancher/.cli2.config') |b64decode }}"
+      dest: /export/home/tower1/cli2.json
+      mode: '0600'
+
+  - name: populate ldapsearch
+    copy:
+      content: "{{ lookup('file', 'files/ldap/.ldapsearch') |b64decode }}"
+      dest: /export/home/tower1/ldapsearch
+      mode: '0600'
+
+  - name: switch to appropriate server
+    shell:
+      cmd: "/usr/local/bin/rancher -c /export/home/tower1 server switch {{ mcm_cluster }}"
+
+  - name: get cluster_id 
+    shell:
+      cmd: '/usr/local/bin/rancher -c /export/home/tower1 context switch < /dev/null 2> /dev/null |awk -v a="{{ cluster_name }}" ''$2==a && $4=="System" {print $1}'''
+    register: cluster_id
+
+  - name: create temporary context file
+    copy: 
+      dest: "/export/home/tower1/context.txt"
+      content: "{{ cluster_id.stdout }}\n"
+
+  - name: get main system project context
+    shell:
+      cmd: "/usr/local/bin/rancher -c /export/home/tower1 context switch < /export/home/tower1/context.txt"
+
+  - name: create project if it does not exist
+    shell:
+      cmd: "(/usr/local/bin/rancher -c /export/home/tower1 project list 2> /dev/null |grep {{ project_name }} > /dev/null)||/usr/local/bin/rancher -c /export/home/tower1 project create {{ project_name }}"
+
+  - name: get project_id
+    shell:
+      cmd: '/usr/local/bin/rancher -c /export/home/tower1 project list |awk -v a="{{ project_name }}" ''$2==a {print $1}'''
+    register: project_id
+
+  - name: switch context
+    shell:
+      cmd: "/usr/local/bin/rancher -c /export/home/tower1 context switch {{ project_id.stdout }}"
+
+  - name: get current project members
+    shell:
+      cmd: "/usr/local/bin/rancher -c /export/home/tower1 project list-members |awk '{ print $2 }' |egrep -v 'USER'"
+    register: project_members_current
+
+  - name: get project members
+    shell:
+      cmd: 'ldapsearch -LLL -D cn=proxyagent,ou=profile,dc=company,dc=gov -y /export/home/tower1/ldapsearch -H ldaps://server-f2f.company.gov -b dc=company,dc=gov -s sub "(|(role={{ eir_acronym }}-APP-{{ company_env }})(role={{ eir_acronym }}-BATCH-{{ company_env }})(role={{ eir_acronym }}-WEB-{{ company_env }}))" cn |awk ''/^cn/{print $2}'''
+    register: project_members
+    when: company_env == "DEV" or
+          company_env == "SIT"
+
+  - name: get RO project members
+    shell:
+      cmd: 'ldapsearch -LLL -D cn=proxyagent,ou=profile,dc=company,dc=gov -y /export/home/tower1/ldapsearch -H ldaps://server-f2f.company.gov -b dc=company,dc=gov -s sub "(|(role={{ eir_acronym }}-APP-{{ company_env }}*)(role={{ eir_acronym }}-BATCH-{{ company_env }}*)(role={{ eir_acronym }}-WEB-{{ company_env }}*))" cn |awk ''/^cn/{print $2}'''
+    register: project_ro_members
+    when: company_env == "PROD" or
+          company_env == "CAT"
+
+#  - name: clean up obsolete memberships
+#    shell: 
+#      cmd: "/usr/local/bin/rancher -c /export/home/tower1 project delete-member-role {{ item }} project-member"
+#    with_items: "{{ project_members_current.stdout_lines }}"
+#    when: item not in project_members.stdout_lines and
+#          item != "Default" and
+#          (company_env == "DEV" or company_env == "SIT")
+
+#  - name: clean up obsolete RO members
+#    shell: 
+#      cmd: "/usr/local/bin/rancher -c /export/home/tower1 project delete-member-role {{ item }} read-only"
+#    with_items: "{{ project_members_current.stdout_lines }}"
+#    when: item not in project_ro_members.stdout_lines and
+#          item != "Default" and
+#          (company_env == "PROD" or company_env == "CAT")
+
+  - name: create members 
+    shell: 
+      cmd: "(/usr/local/bin/rancher -c /export/home/tower1 project list-members 2> /dev/null |grep {{ item }} > /dev/null ) || /usr/local/bin/rancher -c /export/home/tower1 project add-member-role {{ item }} project-member"
+    with_items: "{{ project_members.stdout_lines }}"
+    when: company_env == "DEV" or
+          company_env == "SIT"
+    ignore_errors: true
+
+  - name: create RO members
+    shell: 
+      cmd: "(/usr/local/bin/rancher -c /export/home/tower1 project list-members 2> /dev/null |grep {{ item }} |grep read-only > /dev/null ) || /usr/local/bin/rancher -c /export/home/tower1 project add-member-role {{ item }} read-only"
+    with_items: "{{ project_ro_members.stdout_lines }}"
+    when: company_env == "PROD" or
+          company_env == "CAT"
+    ignore_errors: true
+
+  - name: get main system project context
+    shell:
+      cmd: "/usr/local/bin/rancher -c /export/home/tower1 context switch < /export/home/tower1/context.txt"
+
+  - name: add monitoring-ui-view
+    shell:
+      cmd: "/usr/local/bin/rancher -c /export/home/tower1 project add-member-role {{ item }} monitoring-ui-view"
+    with_items: "{{ project_members.stdout_lines }}"
+    when: company_env == "DEV" or
+          company_env == "SIT"
+    ignore_errors: true
+
+  - name: add monitoring-ui-view for RO
+    shell:
+      cmd: "/usr/local/bin/rancher -c /export/home/tower1 project add-member-role {{ item }} monitoring-ui-view"
+    with_items: "{{ project_ro_members.stdout_lines }}"
+    when: company_env == "CAT" or
+          company_env == "PROD"
+    ignore_errors: true
+
+  - name: clean up
+    file:
+      path: "{{ item }}/export/export/home/tower1/.rancher/cli2.json"
+      state: absent
+    with_items: 
+      - "/export/home/tower1/cli2.json"
+      - "/export/home/tower1/context.txt"
+      - "/export/home/tower1/ldapsearch"

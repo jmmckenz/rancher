@@ -1,0 +1,18 @@
+---
+- name: Clean RKE VM's
+  hosts: all
+  gather_facts: no
+  become: true
+  become_method: sudo
+  become_exe: /usr/bin/sudo
+  
+  tasks:
+  - name: Kill all rke2 processes
+    shell: 
+      cmd: /usr/local/bin/rke2-killall.sh
+    ignore_errors: true
+
+  - name: Uninstall rke2 
+    shell: 
+      cmd: /usr/local/bin/rke2-uninstall.sh
+    ignore_errors: true

@@ -1,0 +1,7 @@
+metadata:
+  labels:
+    usps.gov/name: {{ cluster_name }}
+    usps.gov/env: {{ label_env }}
+    usps.gov/network: {{ label_network }}
+    usps.gov/dc: {{ label_dc }}
+    usps.gov/cluster-env: {{ label_cluster_env }}

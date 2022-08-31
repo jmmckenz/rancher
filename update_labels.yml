@@ -1,0 +1,46 @@
+---
+- name: Label Cluster
+  hosts: all
+  gather_facts: no
+  
+  tasks:
+  - name: populate cli2.json
+    copy:
+      content: "{{ lookup('file', 'files/rancher/.cli2.config') |b64decode }}"
+      dest: /export/home/tower1/cli2.json
+      mode: '0600'
+    delegate_to: '{{ kube_gateway }}'
+    run_once: true
+
+  - name: switch to appropriate server
+    shell:
+      cmd: "/usr/local/bin/rancher -c /export/home/tower1 server switch {{ mcm_cluster }}"
+    delegate_to: '{{ kube_gateway }}'
+    run_once: true
+
+  - name: get cluster_id 
+    shell:
+      cmd: '/usr/local/bin/rancher -c /export/home/tower1 cluster ls 2> /dev/null |awk -v a="{{ cluster_name }}" ''{gsub("*", "")}; $3==a {print $1}'''
+    register: cluster_id
+    delegate_to: '{{ kube_gateway }}'
+    run_once: true
+
+#  - name: cleanup
+#    file:
+#      path: /export/home/tower1/cli2.json
+#      state: absent 
+#    delegate_to: '{{ kube_gateway }}'
+#    run_once: true
+
+  - name: push template to mcm0
+    template:
+      src: templates/tmp/label-patch.yaml
+      dest: /tmp/label-patch.yaml
+    delegate_to: '{{ rancher_mcm0 }}'
+    run_once: true
+
+  - name: apply label patch
+    shell:
+      cmd: '/var/lib/rancher/rke2/bin/kubectl patch cluster.management.cattle.io {{ cluster_id.stdout }} --patch "$(cat /tmp/label-patch.yaml)" --type=merge --kubeconfig=/etc/rancher/rke2/rke2.yaml'
+    delegate_to: '{{ rancher_mcm0 }}'
+    run_once: true

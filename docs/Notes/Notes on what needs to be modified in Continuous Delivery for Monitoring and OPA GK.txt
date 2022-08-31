@@ -1,0 +1,59 @@
+Enable PVC for Grafana
+rancher-monitoring/charts/grafana/values.yaml
+	Line #286 - #312
+	Replace with:
+
+  persistence:
+    accessModes:
+      - ReadWriteOnce
+    storageClassName: longhorn
+    size: 50Gi
+    subPath: null
+    type: pvc
+    annotations: null
+    finalizers: null
+    enabled: true
+
+Enable PVC and misc other options for Prometheus
+	
+rancher-monitoring/values.yaml
+    Line #23
+    Change value for kube-controller-manager to true
+	
+	enabled: true
+	
+    Line #38
+    Change value for kube-scheduler to true
+	
+	enabled: true
+
+    Line #53
+    Change value for kube-proxy to true
+	
+	enabled: true
+
+    Line #66
+    Change value for kube-etcd to true
+	
+	enabled: true
+	
+	Line #2517
+	Replace with:
+
+    enableAdminAPI: true
+	
+    Line #2817
+	Replace with:
+  
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 50Gi
+          selector:
+            matchExpressions: []
+            matchLabels: {}
+          volumeMode: Filesystem 

@@ -1,0 +1,35 @@
+---
+- name: Apply Tolerations
+  hosts: all
+  gather_facts: no
+  become: true
+  become_method: sudo
+  become_exe: /usr/bin/sudo
+  
+  tasks:
+  - name: push tolerations to api0
+    copy:
+      src: "files/root/{{ item }}"
+      dest: "/root/{{ item }}"
+    with_items:
+      - default_tolerations.yaml
+      - logging_tolerations.yaml
+      - no_tolerations.yaml
+    when: inventory_hostname in rancher_api0
+
+#  - name: apply cattle-logging-system patch
+#    shell:
+#      cmd: '/var/lib/rancher/rke2/bin/kubectl patch ds {{ item }} -n cattle-logging-system --patch "$(cat /root/logging_tolerations.yaml)"' 
+#    with_items:
+#      - rancher-logging-fluentbit
+#      - rancher-logging-rke2-journald-aggregator
+#    delegate_to: '{{ rancher_api0 }}'
+#    run_once: true
+
+  - name: apply kube-system patch
+    shell:
+      cmd: '/var/lib/rancher/rke2/bin/kubectl patch ds {{ item }} -n kube-system --patch "$(cat /root/default_tolerations.yaml)"' 
+    with_items:
+      - rke2-ingress-nginx-controller
+      - kube-vip-ds
+    when: inventory_hostname in rancher_api0
